@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXBlue Multi-Account Dashboard</title>
+<style>
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+  margin: 0;
+  padding: 20px;
+}
+h1 { text-align: center; color: #38bdf8; }
+.container { max-width: 900px; margin: 0 auto; }
+textarea {
+  width: 100%; height: 120px; padding: 10px;
+  border-radius: 8px; border: none;
+  font-family: monospace;
+}
+button {
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: bold;
+  padding: 10px 20px;
+  border: none; border-radius: 6px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+button:hover { background: #0ea5e9; }
+.table {
+  width: 100%; border-collapse: collapse; margin-top: 25px;
+}
+.table th, .table td {
+  border: 1px solid #334155;
+  padding: 10px; text-align: center;
+}
+.table th { background: #1e293b; }
+.card {
+  background: #1e293b;
+  margin-top: 10px;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+small { color: #94a3b8; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 FXBlue Multi-Account Dashboard</h1>
+    <p>Enter one or more FXBlue links (one per line):</p>
+    <textarea id="links" placeholder="https://www.fxblue.com/users/example1
+https://www.fxblue.com/users/example2"></textarea>
+    <button onclick="fetchData()">Check Accounts</button>
+
+    <div id="results"></div>
+  </div>
+
+<script>
+async function fetchData() {
+  const output = document.getElementById("results");
+  output.innerHTML = "<p>Loading...</p>";
+
+  const links = document.getElementById("links").value.trim().split("\n");
+  output.innerHTML = "";
+
+  for (const link of links) {
+    if (!link) continue;
+    const cleanLink = link.trim();
+    const username = cleanLink.split("/").pop();
+    const apiUrl = `https://www.fxblue.com/api/user/${username}/latest`;
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h2>${username}</h2><small>Fetching data...</small>`;
+    output.appendChild(card);
+
+    try {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Data not found or blocked");
+      const data = await res.json();
+
+      const stats = {
+        balance: data.balance ?? "N/A",
+        equity: data.equity ?? "N/A",
+        profitLoss: data.gainPct ? data.gainPct.toFixed(2) + "%" : "N/A",
+        openTrades: data.openTrades ?? "N/A",
+        closedTrades: data.closedTrades ?? "N/A",
+        winRate: data.winPct ? data.winPct.toFixed(2) + "%" : "N/A",
+        marginLevel: data.marginLevel ? data.marginLevel + "%" : "N/A",
+        drawdown: data.drawdownPct ? data.drawdownPct + "%" : "N/A",
+        lastTrade: data.lastTradeTime ?? "N/A",
+        software: data.strategyName ?? "N/A"
+      };
+
+      card.innerHTML = `
+        <h2>${username}</h2>
+        <table class="table">
+          <tr><th>Balance</th><td>${stats.balance}</td></tr>
+          <tr><th>Equity</th><td>${stats.equity}</td></tr>
+          <tr><th>Profit/Loss</th><td>${stats.profitLoss}</td></tr>
+          <tr><th>Open Trades</th><td>${stats.openTrades}</td></tr>
+          <tr><th>Closed Trades</th><td>${stats.closedTrades}</td></tr>
+          <tr><th>Win Rate</th><td>${stats.winRate}</td></tr>
+          <tr><th>Margin Level</th><td>${stats.marginLevel}</td></tr>
+          <tr><th>Drawdown</th><td>${stats.drawdown}</td></tr>
+          <tr><th>Last Trade</th><td>${stats.lastTrade}</td></tr>
+          <tr><th>Software</th><td>${stats.software}</td></tr>
+        </table>
+        <small><a href="${cleanLink}" target="_blank" style="color:#38bdf8;">View on FXBlue</a></small>
+      `;
+    } catch (err) {
+      card.innerHTML = `<h2>${username}</h2><p style="color:#f87171;">❌ Error fetching data. The account may be private or API disabled.</p>`;
+    }
+  }
+}
+</script>
+</body>
+</html>
