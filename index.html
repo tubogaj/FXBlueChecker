@@ -54,7 +54,7 @@ async function buildDashboard(){
     container.appendChild(card);
 
     try{
-      // 1️⃣ XML for Balance/Equity
+      // 1️⃣ XML feed (Balance + Equity)
       const xmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`);
       const xmlText=await xmlRes.text();
       const xml=new DOMParser().parseFromString(xmlText,"text/xml");
@@ -65,8 +65,9 @@ async function buildDashboard(){
       // 2️⃣ HTML for Floating P/L, Closed Profit, Recent Trade
       const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
-      const clean=html.replace(/\s+/g," "); // normalize whitespace
+      const clean=html.replace(/\s+/g," ");
 
+      // floating / closed profit regex
       function extract(label){
         const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
         const m=clean.match(re);
@@ -74,14 +75,20 @@ async function buildDashboard(){
       }
       const floating=extract("Floating P/?L");
       const closed=extract("Closed profit");
-      const recentMatch=clean.match(/(Most recent trade|Last trade)[^A-Z]*([A-Z]{3,6})/i);
-      const recent=recentMatch?recentMatch[2]:"N/A";
 
+      // ✅ NEW: parse most recent trade from Orders table
+      // look for the first table row containing "Buy"/"Sell" + symbol + date
+      let recent="N/A";
+      const tradeMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^<]{0,40}?(\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
+      if(tradeMatch){
+        recent=`${tradeMatch[1]} ${tradeMatch[2]} — ${tradeMatch[3]}`;
+      }
+
+      // colors
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
       const cColor=isNaN(cNum)?"":(cNum>=0?"green":"red");
-
       const lastUpdate=new Date().toLocaleString();
 
       card.innerHTML=`
