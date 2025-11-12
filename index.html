@@ -54,7 +54,7 @@ async function buildDashboard(){
     container.appendChild(card);
 
     try{
-      // 1️⃣ XML feed (Balance + Equity)
+      // --- XML feed for balance/equity
       const xmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`);
       const xmlText=await xmlRes.text();
       const xml=new DOMParser().parseFromString(xmlText,"text/xml");
@@ -62,12 +62,12 @@ async function buildDashboard(){
       const balance=getVal("balance");
       const equity=getVal("equity");
 
-      // 2️⃣ HTML for Floating P/L, Closed Profit, Last Update, and Most Recent Trade
+      // --- Full HTML for details
       const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
       const clean=html.replace(/\s+/g," ");
 
-      // Extract floating/closed profit
+      // Extract Floating/Closed profit
       function extract(label){
         const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
         const m=clean.match(re);
@@ -76,24 +76,26 @@ async function buildDashboard(){
       const floating=extract("Floating P/?L");
       const closed=extract("Closed profit");
 
-      // ✅ Extract “Last updated” timestamp from FXBlue
+      // --- Last update (handle "Last update" not "Last updated")
       let fxUpdated="N/A";
-      const updateMatch=clean.match(/Last\s+updated[^0-9]*(\d{4}[-/]\d{2}[-/]\d{2}\s*\d{1,2}:\d{2}(:\d{2})?)/i);
+      const updateMatch=clean.match(/Last\s*update[^0-9]*(\d{1,2}:\d{2}:\d{2})/i);
       if(updateMatch) fxUpdated=updateMatch[1];
 
-      // ✅ Extract the most recent open trade
+      // --- Most recent trade (Open Orders section)
       let recent="N/A";
-      const openOrderMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^>]{0,100}?(?:open|date|opened)?[^>]*?(\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
-      if(openOrderMatch){
-        recent=`${openOrderMatch[1]} ${openOrderMatch[2]} — ${openOrderMatch[3]}`;
+      // Match first occurrence of Buy/Sell, symbol, and date pattern
+      const tradeMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^>]{0,120}?(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}[-/]\d{2}[-/]\d{2})/i);
+      if(tradeMatch){
+        recent=`${tradeMatch[1]} ${tradeMatch[2]} — ${tradeMatch[3]}`;
       }
 
-      // colors
+      // --- Color logic
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
       const cColor=isNaN(cNum)?"":(cNum>=0?"green":"red");
 
+      // --- Output
       card.innerHTML=`
         <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
         <div class="summary">
@@ -111,8 +113,6 @@ async function buildDashboard(){
     }
   }
 }
-// 🔁 Auto-refresh every 10 minutes
-setInterval(()=>buildDashboard(),10*60*1000);
 </script>
 </body>
 </html>
