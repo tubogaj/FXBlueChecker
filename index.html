@@ -103,13 +103,13 @@ async function buildDashboard() {
     container.appendChild(card);
 
     try {
-      // Fetch FXBlue HTML via AllOrigins
-      const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.fxblue.com/users/" + username)}`;
+      // ✅ Use your Cloudflare Worker proxy
+      const apiUrl = `https://fxbluechecker.tubogaj.workers.dev/?user=${username}`;
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Failed to load page");
       const html = await res.text();
 
-      // Extract key numbers using regex
+      // Extract key metrics from FXBlue HTML
       const balance = (html.match(/Balance<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
       const equity = (html.match(/Equity<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
       const gain = (html.match(/Gain \(all-time\)<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
@@ -136,6 +136,11 @@ async function buildDashboard() {
     }
   }
 }
+
+// 🔁 Auto-refresh every 10 minutes
+setInterval(() => {
+  buildDashboard();
+}, 10 * 60 * 1000);
 </script>
 </body>
 </html>
