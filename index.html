@@ -17,6 +17,7 @@ button:hover{background:#0ea5e9;}
 .card h2{color:#38bdf8;margin-top:0;}
 .summary{background:#0f172a;border-radius:6px;padding:10px;margin-bottom:10px;}
 .summary div{margin:5px 0;font-size:0.95rem;}
+.lastupdate{color:#94a3b8;font-size:0.85rem;margin-top:6px;text-align:right;}
 iframe{border:none;width:100%;height:280px;border-radius:6px;}
 a{color:#38bdf8;text-decoration:none;}
 a:hover{text-decoration:underline;}
@@ -40,46 +41,48 @@ https://www.fxblue.com/users/example2"></textarea>
 async function buildDashboard(){
   const container=document.getElementById("results");
   container.innerHTML="";
-  const now=new Date();
-  document.getElementById("timestamp").innerText="Last updated: "+now.toLocaleString();
+  document.getElementById("timestamp").innerText="Dashboard refreshed: "+new Date().toLocaleString();
+
   const links=document.getElementById("links").value.trim().split("\n");
 
   for(const link of links){
-    if(!link) continue;
+    if(!link)continue;
     const username=link.trim().split("/").pop();
     const card=document.createElement("div");
     card.className="card";
-    card.innerHTML=`<h2>${username}</h2><p class="loading">⏳ Loading...</p>`;
+    card.innerHTML=`<h2>${username}</h2><p class="loading">⏳ Loading data…</p>`;
     container.appendChild(card);
 
     try{
-      // 🔹 Step 1: Get XML (Balance + Equity)
-      const xmlUrl=`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`;
-      const xmlRes=await fetch(xmlUrl);
+      // 1️⃣ XML for Balance/Equity
+      const xmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`);
       const xmlText=await xmlRes.text();
-      const parser=new DOMParser();
-      const xml=parser.parseFromString(xmlText,"text/xml");
+      const xml=new DOMParser().parseFromString(xmlText,"text/xml");
       const getVal=tag=>xml.getElementsByTagName(tag)[0]?.textContent||"N/A";
       const balance=getVal("balance");
       const equity=getVal("equity");
 
-      // 🔹 Step 2: Get HTML (Floating P/L, Closed Profit, Most Recent Trade)
-      const htmlUrl=`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`;
-      const htmlRes=await fetch(htmlUrl);
+      // 2️⃣ HTML for Floating P/L, Closed Profit, Recent Trade
+      const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
+      const clean=html.replace(/\s+/g," "); // normalize whitespace
 
-      const floatMatch=html.match(/Floating\s*P\/L[^<]*<\/td>\s*<td[^>]*>([^<]+)/i);
-      const closedMatch=html.match(/Closed\s*profit[^<]*<\/td>\s*<td[^>]*>([^<]+)/i);
-      const recentMatch=html.match(/Most\s*recent\s*trade[^<]*<\/td>\s*<td[^>]*>([^<]+)/i)
-                       ||html.match(/Last\s*trade[^<]*<\/td>\s*<td[^>]*>([^<]+)/i);
-      const floating=floatMatch?floatMatch[1].trim():"N/A";
-      const closed=closedMatch?closedMatch[1].trim():"N/A";
-      const recent=recentMatch?recentMatch[1].trim():"N/A";
+      function extract(label){
+        const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
+        const m=clean.match(re);
+        return m?m[1]:"N/A";
+      }
+      const floating=extract("Floating P/?L");
+      const closed=extract("Closed profit");
+      const recentMatch=clean.match(/(Most recent trade|Last trade)[^A-Z]*([A-Z]{3,6})/i);
+      const recent=recentMatch?recentMatch[2]:"N/A";
 
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
       const cColor=isNaN(cNum)?"":(cNum>=0?"green":"red");
+
+      const lastUpdate=new Date().toLocaleString();
 
       card.innerHTML=`
         <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
@@ -90,14 +93,15 @@ async function buildDashboard(){
           <div>📘 <b>Closed Profit:</b> <span class="${cColor}">${closed}</span></div>
           <div>🕒 <b>Most Recent Trade:</b> ${recent}</div>
         </div>
+        <div class="lastupdate">Updated: ${lastUpdate}</div>
         <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
         <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>`;
     }catch(err){
-      card.innerHTML=`<h2>${username}</h2><p class="red">❌ Error loading data (${err.message})</p>`;
+      card.innerHTML=`<h2>${username}</h2><p class="red">❌ Error loading data: ${err.message}</p>`;
     }
   }
 }
-// 🔁 Auto-refresh every 10 min
+// 🔁 Auto-refresh every 10 minutes
 setInterval(()=>buildDashboard(),10*60*1000);
 </script>
 </body>
