@@ -51,6 +51,7 @@ th:hover { background: #334155; }
 .green { color: #22c55e; font-weight: 600; }
 .red { color: #ef4444; font-weight: 600; }
 small { color: #94a3b8; }
+.loading { color: #facc15; }
 </style>
 </head>
 <body>
@@ -86,27 +87,36 @@ let currentSort = { col: -1, asc: true };
 
 async function fetchData() {
   const tbody = document.getElementById("resultsBody");
-  tbody.innerHTML = `<tr><td colspan="11">Loading...</td></tr>`;
-  const links = document.getElementById("links").value.trim().split("\n");
   tbody.innerHTML = "";
+  const links = document.getElementById("links").value.trim().split("\n");
 
   for (const link of links) {
     if (!link) continue;
     const cleanLink = link.trim();
     const username = cleanLink.split("/").pop();
 
-    // ✅ Using AllOrigins proxy to bypass FXBlue CORS restrictions
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="11" class="loading">⏳ Fetching ${username}...</td>`;
+    tbody.appendChild(tr);
+
     const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.fxblue.com/api/user/" + username + "/latest")}`;
 
     try {
       const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error("Data not found or blocked");
-      const data = await res.json();
+      if (!res.ok) throw new Error("Not found");
+
+      // ✅ Try parsing as JSON, fallback to text if needed
+      let data;
+      const text = await res.text();
+      try { data = JSON.parse(text); } catch { data = null; }
+
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid data format");
+      }
 
       const profitVal = data.gainPct ?? 0;
       const profitColor = profitVal >= 0 ? "green" : "red";
 
-      const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><a href="${cleanLink}" target="_blank" style="color:#38bdf8;text-decoration:none;">${username}</a></td>
         <td>${data.balance ?? "N/A"}</td>
@@ -120,11 +130,8 @@ async function fetchData() {
         <td>${data.lastTradeTime ?? "N/A"}</td>
         <td>${data.strategyName ?? "N/A"}</td>
       `;
-      tbody.appendChild(tr);
     } catch (err) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="11" style="color:#f87171;">❌ ${username} — Unable to load data (private or unavailable)</td>`;
-      tbody.appendChild(tr);
+      tr.innerHTML = `<td colspan="11" style="color:#f87171;">❌ ${username} — Account unavailable or API disabled</td>`;
     }
   }
 }
@@ -138,16 +145,16 @@ function sortTable(colIndex) {
   currentSort = { col: colIndex, asc: isAsc };
 
   rows.sort((a, b) => {
-    const aText = a.cells[colIndex].innerText.replace(/[^\d.-]/g, "");
-    const bText = b.cells[colIndex].innerText.replace(/[^\d.-]/g, "");
+    const aText = a.cells[colIndex]?.innerText.replace(/[^\d.-]/g, "") || "";
+    const bText = b.cells[colIndex]?.innerText.replace(/[^\d.-]/g, "") || "";
     const aNum = parseFloat(aText);
     const bNum = parseFloat(bText);
     if (!isNaN(aNum) && !isNaN(bNum)) {
       return isAsc ? aNum - bNum : bNum - aNum;
     }
     return isAsc
-      ? a.cells[colIndex].innerText.localeCompare(b.cells[colIndex].innerText)
-      : b.cells[colIndex].innerText.localeCompare(a.cells[colIndex].innerText);
+      ? a.cells[colIndex]?.innerText.localeCompare(b.cells[colIndex]?.innerText)
+      : b.cells[colIndex]?.innerText.localeCompare(a.cells[colIndex]?.innerText);
   });
 
   rows.forEach(r => tbody.appendChild(r));
