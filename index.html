@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>FXBlue Multi-Account Dashboard</title>
 <style>
 body {
@@ -48,28 +48,20 @@ button:hover { background: #0ea5e9; }
   border-radius: 10px;
   padding: 15px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 .card h2 {
   color: #38bdf8;
-  margin: 0 0 8px 0;
+  margin-top: 0;
 }
 .summary {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
   background: #0f172a;
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 10px;
 }
 .summary div {
-  flex: 1 1 45%;
-  margin: 4px 0;
-  font-size: 0.9rem;
+  margin: 5px 0;
+  font-size: 0.95rem;
 }
 iframe {
   border: none;
@@ -77,11 +69,11 @@ iframe {
   height: 280px;
   border-radius: 6px;
 }
-a {
-  color: #38bdf8;
-  text-decoration: none;
-}
+a { color: #38bdf8; text-decoration: none; }
 a:hover { text-decoration: underline; }
+.loading { color: #facc15; }
+.red { color: #ef4444; font-weight: bold; }
+.green { color: #22c55e; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -96,7 +88,7 @@ https://www.fxblue.com/users/example2"></textarea>
   </div>
 
 <script>
-function buildDashboard() {
+async function buildDashboard() {
   const container = document.getElementById("results");
   container.innerHTML = "";
   const links = document.getElementById("links").value.trim().split("\n");
@@ -107,22 +99,41 @@ function buildDashboard() {
 
     const card = document.createElement("div");
     card.className = "card";
-
-    card.innerHTML = `
-      <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
-
-      <div class="summary">
-        <div>💰 <b>Balance:</b> <a href="https://www.fxblue.com/users/${username}/statement" target="_blank">View</a></div>
-        <div>📈 <b>Equity:</b> <a href="https://www.fxblue.com/users/${username}/chart?type=equity" target="_blank">Chart</a></div>
-        <div>📊 <b>Gain %:</b> <a href="https://www.fxblue.com/users/${username}/chart?type=gain" target="_blank">Chart</a></div>
-        <div>⚠️ <b>Drawdown:</b> <a href="https://www.fxblue.com/users/${username}/chart?type=drawdown" target="_blank">Chart</a></div>
-        <div>🏆 <b>Win Rate:</b> <a href="https://www.fxblue.com/users/${username}/stats" target="_blank">Stats</a></div>
-      </div>
-
-      <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
-      <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>
-    `;
+    card.innerHTML = `<h2>${username}</h2><p class="loading">⏳ Loading...</p>`;
     container.appendChild(card);
+
+    try {
+      // Fetch FXBlue HTML via AllOrigins
+      const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.fxblue.com/users/" + username)}`;
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Failed to load page");
+      const html = await res.text();
+
+      // Extract key numbers using regex
+      const balance = (html.match(/Balance<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const equity = (html.match(/Equity<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const gain = (html.match(/Gain \(all-time\)<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const drawdown = (html.match(/Max drawdown<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const winRate = (html.match(/Win rate<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+
+      const gainNum = parseFloat(gain.replace(/[^0-9.-]/g, ""));
+      const gainColor = gainNum >= 0 ? "green" : "red";
+
+      card.innerHTML = `
+        <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
+        <div class="summary">
+          <div>💰 <b>Balance:</b> ${balance}</div>
+          <div>📈 <b>Equity:</b> ${equity}</div>
+          <div>📊 <b>Gain %:</b> <span class="${gainColor}">${gain}</span></div>
+          <div>⚠️ <b>Drawdown:</b> ${drawdown}</div>
+          <div>🏆 <b>Win Rate:</b> ${winRate}</div>
+        </div>
+        <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
+        <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>
+      `;
+    } catch (err) {
+      card.innerHTML = `<h2>${username}</h2><p class="red">❌ Failed to load data. Account may be private or unavailable.</p>`;
+    }
   }
 }
 </script>
