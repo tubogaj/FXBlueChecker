@@ -94,7 +94,9 @@ async function fetchData() {
     if (!link) continue;
     const cleanLink = link.trim();
     const username = cleanLink.split("/").pop();
-    const apiUrl = `https://www.fxblue.com/api/user/${username}/latest`;
+
+    // ✅ Using AllOrigins proxy to bypass FXBlue CORS restrictions
+    const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent("https://www.fxblue.com/api/user/" + username + "/latest")}`;
 
     try {
       const res = await fetch(apiUrl);
@@ -121,7 +123,7 @@ async function fetchData() {
       tbody.appendChild(tr);
     } catch (err) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="11" style="color:#f87171;">❌ ${link} — Account private or unavailable</td>`;
+      tr.innerHTML = `<td colspan="11" style="color:#f87171;">❌ ${username} — Unable to load data (private or unavailable)</td>`;
       tbody.appendChild(tr);
     }
   }
