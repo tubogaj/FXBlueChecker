@@ -54,7 +54,7 @@ async function buildDashboard(){
     container.appendChild(card);
 
     try{
-      // --- XML feed for balance/equity
+      // 1️⃣ XML feed for balance/equity
       const xmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`);
       const xmlText=await xmlRes.text();
       const xml=new DOMParser().parseFromString(xmlText,"text/xml");
@@ -62,12 +62,14 @@ async function buildDashboard(){
       const balance=getVal("balance");
       const equity=getVal("equity");
 
-      // --- Full HTML for details
+      // 2️⃣ HTML for details
       const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
-      const clean=html.replace(/\s+/g," ");
+      const parser=new DOMParser();
+      const doc=parser.parseFromString(html,"text/html");
 
-      // Extract Floating/Closed profit
+      // --- Get floating / closed profit text
+      const clean=html.replace(/\s+/g," ");
       function extract(label){
         const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
         const m=clean.match(re);
@@ -76,20 +78,27 @@ async function buildDashboard(){
       const floating=extract("Floating P/?L");
       const closed=extract("Closed profit");
 
-      // --- Last update (handle "Last update" not "Last updated")
+      // --- Extract "Last update" (Overview)
       let fxUpdated="N/A";
-      const updateMatch=clean.match(/Last\s*update[^0-9]*(\d{1,2}:\d{2}:\d{2})/i);
-      if(updateMatch) fxUpdated=updateMatch[1];
+      const overviewMatch=html.match(/Last\s*update<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
+      if(overviewMatch) fxUpdated=overviewMatch[1].trim();
 
-      // --- Most recent trade (Open Orders section)
+      // --- Extract most recent trade (Orders table)
       let recent="N/A";
-      // Match first occurrence of Buy/Sell, symbol, and date pattern
-      const tradeMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^>]{0,120}?(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}[-/]\d{2}[-/]\d{2})/i);
-      if(tradeMatch){
-        recent=`${tradeMatch[1]} ${tradeMatch[2]} — ${tradeMatch[3]}`;
+      // Find the first <tr> after an "Open orders" header
+      const tableMatch=html.match(/Open\s*orders[^<]*<[^>]*table[^>]*>([\s\S]*?)<\/table>/i);
+      if(tableMatch){
+        const firstRowMatch=tableMatch[1].match(/<tr[^>]*>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*>(Buy|Sell)<\/td>\s*<td[^>]*>([A-Z]{3,6})<\/td>[\s\S]*?<td[^>]*>([\d.,-]+)<\/td>[\s\S]*?<td[^>]*>([\d\/-]+)<\/td>/i);
+        if(firstRowMatch){
+          const action=firstRowMatch[1];
+          const symbol=firstRowMatch[2];
+          const profit=firstRowMatch[3];
+          const date=firstRowMatch[4];
+          recent=`${action} ${symbol} — ${date} (${profit})`;
+        }
       }
 
-      // --- Color logic
+      // --- Color coding
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
