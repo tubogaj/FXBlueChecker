@@ -62,12 +62,12 @@ async function buildDashboard(){
       const balance=getVal("balance");
       const equity=getVal("equity");
 
-      // 2️⃣ HTML for Floating P/L, Closed Profit, Recent Trade
+      // 2️⃣ HTML for Floating P/L, Closed Profit, Last Update, and Most Recent Trade
       const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
       const clean=html.replace(/\s+/g," ");
 
-      // floating / closed profit regex
+      // Extract floating/closed profit
       function extract(label){
         const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
         const m=clean.match(re);
@@ -76,12 +76,16 @@ async function buildDashboard(){
       const floating=extract("Floating P/?L");
       const closed=extract("Closed profit");
 
-      // ✅ NEW: parse most recent trade from Orders table
-      // look for the first table row containing "Buy"/"Sell" + symbol + date
+      // ✅ Extract “Last updated” timestamp from FXBlue
+      let fxUpdated="N/A";
+      const updateMatch=clean.match(/Last\s+updated[^0-9]*(\d{4}[-/]\d{2}[-/]\d{2}\s*\d{1,2}:\d{2}(:\d{2})?)/i);
+      if(updateMatch) fxUpdated=updateMatch[1];
+
+      // ✅ Extract the most recent open trade
       let recent="N/A";
-      const tradeMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^<]{0,40}?(\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
-      if(tradeMatch){
-        recent=`${tradeMatch[1]} ${tradeMatch[2]} — ${tradeMatch[3]}`;
+      const openOrderMatch=clean.match(/(Buy|Sell)\s+([A-Z]{3,6})[^>]{0,100}?(?:open|date|opened)?[^>]*?(\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
+      if(openOrderMatch){
+        recent=`${openOrderMatch[1]} ${openOrderMatch[2]} — ${openOrderMatch[3]}`;
       }
 
       // colors
@@ -89,7 +93,6 @@ async function buildDashboard(){
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
       const cColor=isNaN(cNum)?"":(cNum>=0?"green":"red");
-      const lastUpdate=new Date().toLocaleString();
 
       card.innerHTML=`
         <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
@@ -100,7 +103,7 @@ async function buildDashboard(){
           <div>📘 <b>Closed Profit:</b> <span class="${cColor}">${closed}</span></div>
           <div>🕒 <b>Most Recent Trade:</b> ${recent}</div>
         </div>
-        <div class="lastupdate">Updated: ${lastUpdate}</div>
+        <div class="lastupdate">Updated: ${fxUpdated}</div>
         <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
         <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>`;
     }catch(err){
