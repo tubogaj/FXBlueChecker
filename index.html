@@ -61,7 +61,7 @@ async function buildDashboard(){
       const balance=getVal("balance");
       const equity=getVal("equity");
 
-      // --- Full HTML for Floating P/L, Closed Profit, and Last Update
+      // --- Full HTML
       const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
       const html=await htmlRes.text();
       const clean=html.replace(/\s+/g," ");
@@ -77,8 +77,15 @@ async function buildDashboard(){
 
       // --- Last Update from Overview
       let fxUpdated="N/A";
-      const updateMatch=html.match(/Last\s*update<\/td>\s*<td[^>]*>([^<]+)<\/td>/i);
-      if(updateMatch) fxUpdated=updateMatch[1].trim();
+      const updateMatch=html.match(/Last\s*update<\/td>\s*<td[^>]*>(?:<[^>]+>)*([^<]+)(?:<\/[^>]+>)*<\/td>/i);
+      if(updateMatch){
+        fxUpdated=updateMatch[1].trim();
+        // if only time (e.g. 15:32:16), add today's date
+        if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(fxUpdated)){
+          const today=new Date().toISOString().split("T")[0];
+          fxUpdated=`${today} ${fxUpdated}`;
+        }
+      }
 
       // --- Color coding
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
