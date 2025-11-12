@@ -13,7 +13,7 @@ body {
   padding: 20px;
 }
 h1 { text-align: center; color: #38bdf8; }
-.container { max-width: 900px; margin: 0 auto; }
+.container { max-width: 1000px; margin: 0 auto; }
 textarea {
   width: 100%; height: 120px; padding: 10px;
   border-radius: 8px; border: none;
@@ -29,21 +29,27 @@ button {
   margin-top: 10px;
 }
 button:hover { background: #0ea5e9; }
-.table {
-  width: 100%; border-collapse: collapse; margin-top: 25px;
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 25px;
+  font-size: 0.95rem;
 }
-.table th, .table td {
+th, td {
   border: 1px solid #334155;
-  padding: 10px; text-align: center;
+  padding: 10px;
+  text-align: center;
 }
-.table th { background: #1e293b; }
-.card {
+th {
   background: #1e293b;
-  margin-top: 10px;
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  cursor: pointer;
+  user-select: none;
 }
+th:hover { background: #334155; }
+
+.green { color: #22c55e; font-weight: 600; }
+.red { color: #ef4444; font-weight: 600; }
 small { color: #94a3b8; }
 </style>
 </head>
@@ -55,16 +61,34 @@ small { color: #94a3b8; }
 https://www.fxblue.com/users/example2"></textarea>
     <button onclick="fetchData()">Check Accounts</button>
 
-    <div id="results"></div>
+    <table id="resultsTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">Account</th>
+          <th onclick="sortTable(1)">Balance</th>
+          <th onclick="sortTable(2)">Equity</th>
+          <th onclick="sortTable(3)">Profit/Loss</th>
+          <th onclick="sortTable(4)">Open Trades</th>
+          <th onclick="sortTable(5)">Closed Trades</th>
+          <th onclick="sortTable(6)">Win Rate</th>
+          <th onclick="sortTable(7)">Margin Level</th>
+          <th onclick="sortTable(8)">Drawdown</th>
+          <th onclick="sortTable(9)">Last Trade</th>
+          <th onclick="sortTable(10)">Software</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
   </div>
 
 <script>
-async function fetchData() {
-  const output = document.getElementById("results");
-  output.innerHTML = "<p>Loading...</p>";
+let currentSort = { col: -1, asc: true };
 
+async function fetchData() {
+  const tbody = document.getElementById("resultsBody");
+  tbody.innerHTML = `<tr><td colspan="11">Loading...</td></tr>`;
   const links = document.getElementById("links").value.trim().split("\n");
-  output.innerHTML = "";
+  tbody.innerHTML = "";
 
   for (const link of links) {
     if (!link) continue;
@@ -72,49 +96,59 @@ async function fetchData() {
     const username = cleanLink.split("/").pop();
     const apiUrl = `https://www.fxblue.com/api/user/${username}/latest`;
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<h2>${username}</h2><small>Fetching data...</small>`;
-    output.appendChild(card);
-
     try {
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error("Data not found or blocked");
       const data = await res.json();
 
-      const stats = {
-        balance: data.balance ?? "N/A",
-        equity: data.equity ?? "N/A",
-        profitLoss: data.gainPct ? data.gainPct.toFixed(2) + "%" : "N/A",
-        openTrades: data.openTrades ?? "N/A",
-        closedTrades: data.closedTrades ?? "N/A",
-        winRate: data.winPct ? data.winPct.toFixed(2) + "%" : "N/A",
-        marginLevel: data.marginLevel ? data.marginLevel + "%" : "N/A",
-        drawdown: data.drawdownPct ? data.drawdownPct + "%" : "N/A",
-        lastTrade: data.lastTradeTime ?? "N/A",
-        software: data.strategyName ?? "N/A"
-      };
+      const profitVal = data.gainPct ?? 0;
+      const profitColor = profitVal >= 0 ? "green" : "red";
 
-      card.innerHTML = `
-        <h2>${username}</h2>
-        <table class="table">
-          <tr><th>Balance</th><td>${stats.balance}</td></tr>
-          <tr><th>Equity</th><td>${stats.equity}</td></tr>
-          <tr><th>Profit/Loss</th><td>${stats.profitLoss}</td></tr>
-          <tr><th>Open Trades</th><td>${stats.openTrades}</td></tr>
-          <tr><th>Closed Trades</th><td>${stats.closedTrades}</td></tr>
-          <tr><th>Win Rate</th><td>${stats.winRate}</td></tr>
-          <tr><th>Margin Level</th><td>${stats.marginLevel}</td></tr>
-          <tr><th>Drawdown</th><td>${stats.drawdown}</td></tr>
-          <tr><th>Last Trade</th><td>${stats.lastTrade}</td></tr>
-          <tr><th>Software</th><td>${stats.software}</td></tr>
-        </table>
-        <small><a href="${cleanLink}" target="_blank" style="color:#38bdf8;">View on FXBlue</a></small>
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><a href="${cleanLink}" target="_blank" style="color:#38bdf8;text-decoration:none;">${username}</a></td>
+        <td>${data.balance ?? "N/A"}</td>
+        <td>${data.equity ?? "N/A"}</td>
+        <td class="${profitColor}">${profitVal.toFixed(2)}%</td>
+        <td>${data.openTrades ?? "N/A"}</td>
+        <td>${data.closedTrades ?? "N/A"}</td>
+        <td>${data.winPct ? data.winPct.toFixed(2) + "%" : "N/A"}</td>
+        <td>${data.marginLevel ? data.marginLevel + "%" : "N/A"}</td>
+        <td>${data.drawdownPct ? data.drawdownPct + "%" : "N/A"}</td>
+        <td>${data.lastTradeTime ?? "N/A"}</td>
+        <td>${data.strategyName ?? "N/A"}</td>
       `;
+      tbody.appendChild(tr);
     } catch (err) {
-      card.innerHTML = `<h2>${username}</h2><p style="color:#f87171;">❌ Error fetching data. The account may be private or API disabled.</p>`;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="11" style="color:#f87171;">❌ ${link} — Account private or unavailable</td>`;
+      tbody.appendChild(tr);
     }
   }
+}
+
+function sortTable(colIndex) {
+  const table = document.getElementById("resultsTable");
+  const tbody = table.tBodies[0];
+  const rows = Array.from(tbody.rows);
+
+  const isAsc = currentSort.col === colIndex ? !currentSort.asc : true;
+  currentSort = { col: colIndex, asc: isAsc };
+
+  rows.sort((a, b) => {
+    const aText = a.cells[colIndex].innerText.replace(/[^\d.-]/g, "");
+    const bText = b.cells[colIndex].innerText.replace(/[^\d.-]/g, "");
+    const aNum = parseFloat(aText);
+    const bNum = parseFloat(bText);
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return isAsc ? aNum - bNum : bNum - aNum;
+    }
+    return isAsc
+      ? a.cells[colIndex].innerText.localeCompare(b.cells[colIndex].innerText)
+      : b.cells[colIndex].innerText.localeCompare(a.cells[colIndex].innerText);
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
 }
 </script>
 </body>
