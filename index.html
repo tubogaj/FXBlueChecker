@@ -12,94 +12,63 @@ body {
   margin: 0;
   padding: 20px;
 }
-h1 {
-  text-align: center;
-  color: #38bdf8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.container { max-width: 1200px; margin: 0 auto; }
+h1 { text-align:center; color:#38bdf8; }
+.container { max-width:1200px; margin:0 auto; }
 textarea {
-  width: 100%; height: 120px; padding: 10px;
-  border-radius: 8px; border: none;
-  font-family: monospace;
+  width:100%; height:120px; padding:10px;
+  border-radius:8px; border:none; font-family:monospace;
 }
 button {
-  background: #38bdf8;
-  color: #0f172a;
-  font-weight: bold;
-  padding: 10px 20px;
-  border: none; border-radius: 6px;
-  cursor: pointer;
-  margin-top: 10px;
+  background:#38bdf8; color:#0f172a; font-weight:bold;
+  padding:10px 20px; border:none; border-radius:6px; cursor:pointer; margin-top:10px;
 }
-button:hover { background: #0ea5e9; }
-
+button:hover { background:#0ea5e9; }
 #timestamp { text-align:center; color:#94a3b8; margin-top:10px; }
-
 #results {
-  margin-top: 30px;
-  display: grid;
-  gap: 25px;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  margin-top:30px; display:grid; gap:25px;
+  grid-template-columns:repeat(auto-fit,minmax(500px,1fr));
 }
 .card {
-  background: #1e293b;
-  border-radius: 10px;
-  padding: 15px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  background:#1e293b; border-radius:10px; padding:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.3);
 }
-.card h2 {
-  color: #38bdf8;
-  margin-top: 0;
-}
+.card h2 { color:#38bdf8; margin-top:0; }
 .summary {
-  background: #0f172a;
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 10px;
+  background:#0f172a; border-radius:6px; padding:10px; margin-bottom:10px;
 }
-.summary div {
-  margin: 5px 0;
-  font-size: 0.95rem;
-}
+.summary div { margin:5px 0; font-size:0.95rem; }
 iframe {
-  border: none;
-  width: 100%;
-  height: 280px;
-  border-radius: 6px;
+  border:none; width:100%; height:280px; border-radius:6px;
 }
-a { color: #38bdf8; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.loading { color: #facc15; }
-.red { color: #ef4444; font-weight: bold; }
-.green { color: #22c55e; font-weight: bold; }
+a { color:#38bdf8; text-decoration:none; }
+a:hover { text-decoration:underline; }
+.green { color:#22c55e; font-weight:bold; }
+.red { color:#ef4444; font-weight:bold; }
+.loading { color:#facc15; }
 </style>
 </head>
 <body>
-  <div class="container">
-    <h1>💹 FXBlue Multi-Account Dashboard</h1>
-    <p>Enter one or more FXBlue links (one per line):</p>
-    <textarea id="links" placeholder="https://www.fxblue.com/users/example1
+<div class="container">
+  <h1>💹 FXBlue Multi-Account Dashboard</h1>
+  <p>Enter one or more FXBlue links (one per line):</p>
+  <textarea id="links" placeholder="https://www.fxblue.com/users/example1
 https://www.fxblue.com/users/example2"></textarea>
-    <button onclick="buildDashboard()">Show Accounts</button>
-    <div id="timestamp"></div>
-
-    <div id="results"></div>
-  </div>
+  <button onclick="buildDashboard()">Show Accounts</button>
+  <div id="timestamp"></div>
+  <div id="results"></div>
+</div>
 
 <script>
 async function buildDashboard() {
   const container = document.getElementById("results");
   container.innerHTML = "";
-  const links = document.getElementById("links").value.trim().split("\n");
 
-  // 🕒 update timestamp
+  // 🕒 Timestamp update
   const now = new Date();
   document.getElementById("timestamp").innerText =
     "Last updated: " + now.toLocaleString();
+
+  const links = document.getElementById("links").value.trim().split("\n");
 
   for (const link of links) {
     if (!link) continue;
@@ -111,44 +80,41 @@ async function buildDashboard() {
     container.appendChild(card);
 
     try {
-      // ✅ Use your Cloudflare Worker proxy
-      const apiUrl = `https://fxbluechecker.tubogaj.workers.dev/?user=${username}`;
+      // ✅ Fetch XML feed through your Cloudflare Worker
+      const apiUrl = `https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`;
       const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error("Failed to load page");
-      const html = await res.text();
+      if (!res.ok) throw new Error("Feed unavailable");
+      const xmlText = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(xmlText, "text/xml");
 
-      // --- Extract values ---
-      const balance = (html.match(/Balance<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const equity  = (html.match(/Equity<\/td><td[^>]*>([^<]+)/i)  || [])[1] || "N/A";
-      const floatingPL = (html.match(/Floating P\/L<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const closedProfit = (html.match(/Closed profit<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      // Extract values safely
+      const getVal = tag => xml.getElementsByTagName(tag)[0]?.textContent || "N/A";
+      const balance = getVal("balance");
+      const equity = getVal("equity");
+      const floating = getVal("floatingpl");
+      const closed = getVal("closedprofit");
+      const recent = getVal("mostrecenttrade") || getVal("lasttrade");
 
-      // attempt to capture most recent trade description
-      const recentTrade = (html.match(/<td[^>]*>Most recent trade<\/td><td[^>]*>([^<]+)/i) ||
-                          html.match(/<td[^>]*>Last trade<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const fNum = parseFloat(floating.replace(/[^0-9.-]/g, ""));
+      const cNum = parseFloat(closed.replace(/[^0-9.-]/g, ""));
+      const fColor = isNaN(fNum)? "" : (fNum>=0?"green":"red");
+      const cColor = isNaN(cNum)? "" : (cNum>=0?"green":"red");
 
-      // color coding
-      const floatNum = parseFloat(floatingPL.replace(/[^0-9.-]/g, ""));
-      const floatColor = isNaN(floatNum) ? "" : (floatNum >= 0 ? "green" : "red");
-
-      const closedNum = parseFloat(closedProfit.replace(/[^0-9.-]/g, ""));
-      const closedColor = isNaN(closedNum) ? "" : (closedNum >= 0 ? "green" : "red");
-
-      // --- Display card ---
       card.innerHTML = `
         <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
         <div class="summary">
           <div>💰 <b>Balance:</b> ${balance}</div>
           <div>📈 <b>Equity:</b> ${equity}</div>
-          <div>💹 <b>Floating P/L:</b> <span class="${floatColor}">${floatingPL}</span></div>
-          <div>📘 <b>Closed Profit:</b> <span class="${closedColor}">${closedProfit}</span></div>
-          <div>🕒 <b>Most Recent Trade:</b> ${recentTrade}</div>
+          <div>💹 <b>Floating P/L:</b> <span class="${fColor}">${floating}</span></div>
+          <div>📘 <b>Closed Profit:</b> <span class="${cColor}">${closed}</span></div>
+          <div>🕒 <b>Most Recent Trade:</b> ${recent}</div>
         </div>
         <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
         <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>
       `;
     } catch (err) {
-      card.innerHTML = `<h2>${username}</h2><p class="red">❌ Failed to load data. Account may be private or unavailable.</p>`;
+      card.innerHTML = `<h2>${username}</h2><p class="red">❌ Couldn’t load data. Account may be private or the XML feed disabled.</p>`;
     }
   }
 }
