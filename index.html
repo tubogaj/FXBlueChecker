@@ -53,41 +53,42 @@ async function buildDashboard(){
     container.appendChild(card);
 
     try{
-      // --- XML feed (Balance + Equity)
+      // --- Fetch XML feed (main data source)
       const xmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}/xml`);
       const xmlText=await xmlRes.text();
       const xml=new DOMParser().parseFromString(xmlText,"text/xml");
-      const getVal=tag=>xml.getElementsByTagName(tag)[0]?.textContent||"N/A";
+      const getVal=tag=>xml.getElementsByTagName(tag)[0]?.textContent?.trim()||"N/A";
+
+      // --- Primary data from XML
       const balance=getVal("balance");
       const equity=getVal("equity");
+      const floating=getVal("floatingpl");
+      const closed=getVal("closedprofit");
+      let fxUpdated=getVal("lastupdate");
 
-      // --- Full HTML
-      const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
-      const html=await htmlRes.text();
-      const clean=html.replace(/\s+/g," ");
-
-      // --- Floating & Closed Profit
-      function extract(label){
-        const re=new RegExp(label+"[^\\d-]*([+-]?[\\d,\\.]+)","i");
-        const m=clean.match(re);
-        return m?m[1]:"N/A";
-      }
-      const floating=extract("Floating P/?L");
-      const closed=extract("Closed profit");
-
-      // --- Last Update from Overview
-      let fxUpdated="N/A";
-      const updateMatch=html.match(/Last\s*update<\/td>\s*<td[^>]*>(?:<[^>]+>)*([^<]+)(?:<\/[^>]+>)*<\/td>/i);
-      if(updateMatch){
-        fxUpdated=updateMatch[1].trim();
-        // if only time (e.g. 15:32:16), add today's date
+      // --- If XML has only time, append today's date
+      if(fxUpdated!=="N/A"){
         if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(fxUpdated)){
           const today=new Date().toISOString().split("T")[0];
           fxUpdated=`${today} ${fxUpdated}`;
         }
       }
 
-      // --- Color coding
+      // --- If XML doesn't have it, try from HTML as fallback
+      if(fxUpdated==="N/A"){
+        const htmlRes=await fetch(`https://fxbluechecker.tubogaj.workers.dev/?user=${username}`);
+        const html=await htmlRes.text();
+        const match=html.match(/Last\s*update<\/td>\s*<td[^>]*>(?:<[^>]+>)*([^<]+)(?:<\/[^>]+>)*<\/td>/i);
+        if(match){
+          fxUpdated=match[1].trim();
+          if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(fxUpdated)){
+            const today=new Date().toISOString().split("T")[0];
+            fxUpdated=`${today} ${fxUpdated}`;
+          }
+        }
+      }
+
+      // --- Color coding for P/L and Profit
       const fNum=parseFloat(floating.replace(/[^0-9.-]/g,""));
       const cNum=parseFloat(closed.replace(/[^0-9.-]/g,""));
       const fColor=isNaN(fNum)?"":(fNum>=0?"green":"red");
