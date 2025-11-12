@@ -37,6 +37,8 @@ button {
 }
 button:hover { background: #0ea5e9; }
 
+#timestamp { text-align:center; color:#94a3b8; margin-top:10px; }
+
 #results {
   margin-top: 30px;
   display: grid;
@@ -78,11 +80,12 @@ a:hover { text-decoration: underline; }
 </head>
 <body>
   <div class="container">
-    <h1>📊 FXBlue Multi-Account Dashboard</h1>
+    <h1>💹 FXBlue Multi-Account Dashboard</h1>
     <p>Enter one or more FXBlue links (one per line):</p>
     <textarea id="links" placeholder="https://www.fxblue.com/users/example1
 https://www.fxblue.com/users/example2"></textarea>
     <button onclick="buildDashboard()">Show Accounts</button>
+    <div id="timestamp"></div>
 
     <div id="results"></div>
   </div>
@@ -92,6 +95,11 @@ async function buildDashboard() {
   const container = document.getElementById("results");
   container.innerHTML = "";
   const links = document.getElementById("links").value.trim().split("\n");
+
+  // 🕒 update timestamp
+  const now = new Date();
+  document.getElementById("timestamp").innerText =
+    "Last updated: " + now.toLocaleString();
 
   for (const link of links) {
     if (!link) continue;
@@ -109,24 +117,32 @@ async function buildDashboard() {
       if (!res.ok) throw new Error("Failed to load page");
       const html = await res.text();
 
-      // Extract key metrics from FXBlue HTML
+      // --- Extract values ---
       const balance = (html.match(/Balance<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const equity = (html.match(/Equity<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const gain = (html.match(/Gain \(all-time\)<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const drawdown = (html.match(/Max drawdown<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
-      const winRate = (html.match(/Win rate<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const equity  = (html.match(/Equity<\/td><td[^>]*>([^<]+)/i)  || [])[1] || "N/A";
+      const floatingPL = (html.match(/Floating P\/L<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
+      const closedProfit = (html.match(/Closed profit<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
 
-      const gainNum = parseFloat(gain.replace(/[^0-9.-]/g, ""));
-      const gainColor = gainNum >= 0 ? "green" : "red";
+      // attempt to capture most recent trade description
+      const recentTrade = (html.match(/<td[^>]*>Most recent trade<\/td><td[^>]*>([^<]+)/i) ||
+                          html.match(/<td[^>]*>Last trade<\/td><td[^>]*>([^<]+)/i) || [])[1] || "N/A";
 
+      // color coding
+      const floatNum = parseFloat(floatingPL.replace(/[^0-9.-]/g, ""));
+      const floatColor = isNaN(floatNum) ? "" : (floatNum >= 0 ? "green" : "red");
+
+      const closedNum = parseFloat(closedProfit.replace(/[^0-9.-]/g, ""));
+      const closedColor = isNaN(closedNum) ? "" : (closedNum >= 0 ? "green" : "red");
+
+      // --- Display card ---
       card.innerHTML = `
         <h2><a href="https://www.fxblue.com/users/${username}" target="_blank">${username}</a></h2>
         <div class="summary">
           <div>💰 <b>Balance:</b> ${balance}</div>
           <div>📈 <b>Equity:</b> ${equity}</div>
-          <div>📊 <b>Gain %:</b> <span class="${gainColor}">${gain}</span></div>
-          <div>⚠️ <b>Drawdown:</b> ${drawdown}</div>
-          <div>🏆 <b>Win Rate:</b> ${winRate}</div>
+          <div>💹 <b>Floating P/L:</b> <span class="${floatColor}">${floatingPL}</span></div>
+          <div>📘 <b>Closed Profit:</b> <span class="${closedColor}">${closedProfit}</span></div>
+          <div>🕒 <b>Most Recent Trade:</b> ${recentTrade}</div>
         </div>
         <iframe src="https://www.fxblue.com/users/${username}/chart?type=equity"></iframe>
         <p><a href="https://www.fxblue.com/users/${username}" target="_blank">🔗 View full FXBlue page</a></p>
@@ -138,9 +154,7 @@ async function buildDashboard() {
 }
 
 // 🔁 Auto-refresh every 10 minutes
-setInterval(() => {
-  buildDashboard();
-}, 10 * 60 * 1000);
+setInterval(() => buildDashboard(), 10 * 60 * 1000);
 </script>
 </body>
 </html>
